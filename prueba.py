@@ -1,5 +1,6 @@
 import locale
 from datetime import datetime
+import pandas as pd
 
 locale.setlocale(locale.LC_TIME, 'es_ES')
 
@@ -21,3 +22,6 @@ print(f"Mes actual: {mes_actual}")
 print(f"Año actual: {año_actual}")
 print(f"Hora actual: {hora_actual}")
 print(f"Minutos actuales: {minuto_actual}")
+
+df = pd.read_csv('fake-data.csv')
+print(df.columns)
