@@ -8,6 +8,8 @@ ahora = datetime.now()
 
 doc = DocxTemplate("at-plantilla-Documento1.docx")
 
+
+
 dia_actual = ahora.strftime("%d")
 mes_actual = ahora.strftime("%B")
 año_actual = ahora.strftime("%Y")
@@ -22,7 +24,7 @@ my_context = {
     'minuto_actual': minuto_actual,
 }
 
-df = pd.read_csv('fake-data.csv', sep=';')
+df = pd.read_csv('fake-data.csv')
 
 for index, fila in df.iterrows():
     context = {
