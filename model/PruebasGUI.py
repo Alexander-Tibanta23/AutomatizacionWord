@@ -25,10 +25,10 @@ def load_detail_data(id_number):
     try:
         workbook = openpyxl.load_workbook(new_excel_path)
         sheet = workbook.active
+        # Limpiar los datos antiguos antes de cargar nuevos
+        details_storage[id_number] = []
         for row in sheet.iter_rows(min_row=2, values_only=True):
-            if row[3] == id_number:  # Asumiendo que la columna "ID Number" es la cuarta columna
-                if id_number not in details_storage:
-                    details_storage[id_number] = []
+            if row[3] == id_number:
                 details_storage[id_number].append(row)
     except FileNotFoundError:
         print("Detalles del archivo Excel no encontrado.")
@@ -198,19 +198,100 @@ def open_details_window(name, ruc, id_number, lawyer):
             entry = ttk.Entry(inputs_frame)
         entry.grid(row=i, column=1, padx=10, pady=5, sticky="ew")
         entries.append(entry)
-    
+
+    def delete_detail_from_excel(id_number, detail_to_delete):
+        filepath = 'detallesBasedatosPrueba.xlsx'
+        wb = load_workbook(filename=filepath)
+        sheet = wb.active
+        
+        for row in range(2, sheet.max_row + 1):
+            if sheet.cell(row=row, column=4).value == id_number and sheet.cell(row=row, column=1).value == detail_to_delete[0]:
+                sheet.delete_rows(row)
+                break
+        
+        wb.save(filename=filepath)
+
+    def update_detail_in_excel(id_number, old_detail, new_detail):
+        filepath = 'detallesBasedatosPrueba.xlsx'
+        wb = load_workbook(filename=filepath)
+        sheet = wb.active
+        
+        for row in range(2, sheet.max_row + 1):
+            if sheet.cell(row=row, column=4).value == id_number and sheet.cell(row=row, column=1).value == old_detail[0]:
+                for col, value in enumerate(new_detail, start=1):
+                    sheet.cell(row=row, column=col).value = value
+                break
+        
+        wb.save(filename=filepath)
+
+    def delete_detail(detail_treeview, id_number):
+        selected_item = detail_treeview.selection()[0]
+        if selected_item:
+            detail_to_delete = detail_treeview.item(selected_item, 'values')
+            delete_detail_from_excel(id_number, detail_to_delete)
+            detail_treeview.delete(selected_item)
+            # Actualizar details_storage
+            details_storage[id_number] = [detail for detail in details_storage[id_number] if detail[0] != detail_to_delete[0]]
+
+    def get_selected_item_id(treeview):
+        selected_item = treeview.selection()[0]  # Obtiene el primer ítem seleccionado (asumiendo selección única)
+        item = treeview.item(selected_item)
+        id_number = item['values'][0]  # Asumiendo que el ID está en la primera columna
+        return id_number
+
+    def setup_delete_button(treeview, button_parent):
+        delete_button = ttk.Button(button_parent, text="Eliminar",
+                                command=lambda: delete_detail(get_selected_item_id(treeview)))
+        delete_button.grid(row=5, column=0, padx=10, pady=5, sticky="ew")
+
+    # Suponiendo que 'inputs_frame' es donde quieres el botón y 'detail_treeview' es tu Treeview
+    setup_delete_button(detail_treeview, inputs_frame)
+
+
+    def edit_detail(detail_treeview, entries):
+        selected_item = detail_treeview.selection()[0]
+        if selected_item:
+            selected_values = detail_treeview.item(selected_item, 'values')
+            for entry in entries:
+                if isinstance(entry, ttk.Combobox):
+                    entry.set('')
+                else:
+                    entry.delete(0, tk.END)
+            entries[0].insert(0, selected_values[0])  # Título de Crédito
+            entries[1].set(selected_values[4])  # Concepto; es un Combobox
+            entries[2].insert(0, selected_values[5])  # Valor Capital
+            entries[3].insert(0, selected_values[6])  # Valor 30%
+            
+    def update_detail(detail_treeview, id_number, entries):
+        selected_item = detail_treeview.selection()[0]
+        if selected_item:
+            # Construct new detail list from entry widgets
+            new_values = [entries[0].get(), name, ruc, id_number, entries[1].get(), entries[2].get(), entries[3].get(), lawyer]  # Assuming 'name', 'ruc', 'lawyer' are accessible here
+            old_detail = detail_treeview.item(selected_item, 'values')
+            
+            # Update Excel
+            update_detail_in_excel(id_number, old_detail, new_values)
+            
+            # Update in the Treeview
+            detail_treeview.item(selected_item, values=new_values)
+            
+            # Update in details_storage
+            details_storage[id_number] = [new_values if detail[0] == old_detail[0] else detail for detail in details_storage[id_number]]
+
     # Botón para guardar
     ttk.Button(inputs_frame, text="Guardar", command=lambda: save_details(name, ruc, id_number, lawyer, entries[0].get(), entries[1].get(), entries[2].get(), entries[3].get(), detail_treeview)).grid(row=len(labels), column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
     # Añadir botones de Eliminar y Editar en la ventana de detalles
-    #ttk.Button(inputs_frame, text="Eliminar", command=lambda: delete_detail(detail_treeview, id_number)).grid(row=5, column=0, padx=10, pady=5, sticky="ew")
-    #ttk.Button(inputs_frame, text="Editar", command=lambda: edit_detail(detail_treeview, entries)).grid(row=5, column=1, padx=10, pady=5, sticky="ew")
+    ttk.Button(inputs_frame, text="Eliminar", command=lambda: delete_detail(detail_treeview, id_number)).grid(row=5, column=0, padx=10, pady=5, sticky="ew")
+    
+    ttk.Button(inputs_frame, text="Editar", command=lambda: edit_detail(detail_treeview, entries)).grid(row=5, column=1, padx=10, pady=5, sticky="ew")
+    
+    # Botón para actualizar
+    ttk.Button(inputs_frame, text="Actualizar", command=lambda: update_detail(detail_treeview, id_number, entries)).grid(row=6, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
 
 
     # Ajuste para que los campos de entrada se expandan con la ventana
     details_window.columnconfigure(0, weight=1)
     inputs_frame.columnconfigure(1, weight=1)
-
-
 
 # Función modificada save_details para manejar los datos correctamente.
 def save_details(name, ruc, id_number, lawyer, titulo_credito, concepto, valor_capital, valor_30, detail_treeview):
