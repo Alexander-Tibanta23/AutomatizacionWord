@@ -1,85 +1,119 @@
 import tkinter as tk
 from tkinter import ttk
-from docxtpl import DocxTemplate
-from datetime import datetime, timedelta
+import openpyxl
+from openpyxl.utils import get_column_letter
 
-# Variables globales
-document_data = []
+def load_data():
+    path = "C:/Users/USUARIO/Documents/GitHub/AutomatizacionWord/basedatosPrueba.xlsx"
+    workbook = openpyxl.load_workbook(path)
+    sheet = workbook.active
 
-# Función para insertar datos desde la GUI a la lista
+    list_values = list(sheet.values)
+    for col_name in list_values[0]:
+        treeview.heading(col_name, text=col_name)
+
+    for value_tuple in list_values[1:]:
+        treeview.insert('', tk.END, values=value_tuple)
+
 def insert_row():
-    nombre_juez = nombre_juez_entry.get()
-    nombre = nombre_entry.get()
-    numero_ruc = numero_ruc_entry.get()
-    numero_cedula = numero_cedula_entry.get()
-    nombre_abogado = nombre_abogado_entry.get()
+    judge = judge_entry.get()
+    name = name_entry.get()
+    ruc = ruc_entry.get()
+    id_number = id_entry.get()
+    lawyer = lawyer_combobox.get()
 
-    row_data = {
-        'Juez': nombre_juez,
-        'nombre': nombre,
-        'ruc': numero_ruc,
-        'cedula': numero_cedula,
-        'abogado': nombre_abogado,
-    }
-    document_data.append(row_data)
+    path = "C:/Users/USUARIO/Documents/GitHub/AutomatizacionWord/basedatosPrueba.xlsx"
+    workbook = openpyxl.load_workbook(path)
+    sheet = workbook.active
+    row_values = [judge, name, ruc, id_number, lawyer]
+    sheet.append(row_values)
+    workbook.save(path)
+
+    # Insert row into treeview
+    treeview.insert('', tk.END, values=row_values)
     
-    # Limpiar campos
-    nombre_juez_entry.delete(0, tk.END)
-    nombre_entry.delete(0, tk.END)
-    numero_ruc_entry.delete(0, tk.END)
-    numero_cedula_entry.delete(0, tk.END)
-    nombre_abogado_entry.delete(0, tk.END)
+    # Clear the values
+    judge_entry.delete(0, "end")
+    name_entry.delete(0, "end")
+    ruc_entry.delete(0, "end")
+    id_entry.delete(0, "end")
+    lawyer_combobox.set(lawyer_list[0])
 
-# Función para generar documentos Word con fecha y hora actualizadas
-def generate_documents():
-    inicio = datetime.now()
-    doc = DocxTemplate("at-plantilla-Documento1.docx")
-    for index, fila in enumerate(document_data):
-        ahora = inicio + timedelta(minutes=index)  # Incrementa un minuto por cada documento
-        my_context = {
-            'dia_actual': ahora.strftime("%d"),
-            'mes_actual': ahora.strftime("%B"),
-            'año_actual': ahora.strftime("%Y"),
-            'hora_actual': ahora.strftime("%H"),
-            'minuto_actual': ahora.strftime("%M"),
-        }
-        combined_context = {**fila, **my_context}
-        doc.render(combined_context)
-        doc.save(f"Documento-Generado_{index}.docx")
-
-# Configuración de la GUI
 root = tk.Tk()
-root.title("Generador de Documentos")
 
-main_frame = ttk.Frame(root, padding="10")
-main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+style = ttk.Style(root)
+root.tk.call("source", "forest-dark.tcl")
+style.theme_use("forest-dark")
 
-# Campos de entrada
-nombre_juez_entry = ttk.Entry(main_frame)
-nombre_juez_entry.grid(row=0, column=1, pady=2, sticky=(tk.W, tk.E))
-ttk.Label(main_frame, text="Nombre del Juez:").grid(row=0, column=0, pady=2, sticky=tk.W)
+lawyer_list = ["Dr. Christian Santiago Izurieta Cruz", "Dr. Atiencia Atiencia Atiencia Atiencia"]
 
-nombre_entry = ttk.Entry(main_frame)
-nombre_entry.grid(row=1, column=1, pady=2, sticky=(tk.W, tk.E))
-ttk.Label(main_frame, text="Nombre:").grid(row=1, column=0, pady=2, sticky=tk.W)
+frame = ttk.Frame(root)
+frame.pack()
 
-numero_ruc_entry = ttk.Entry(main_frame)
-numero_ruc_entry.grid(row=2, column=1, pady=2, sticky=(tk.W, tk.E))
-ttk.Label(main_frame, text="Número RUC:").grid(row=2, column=0, pady=2, sticky=tk.W)
+widgets_frame = ttk.LabelFrame(frame, text="Insertar Datos")
+widgets_frame.grid(row=0, column=0, padx=20, pady=10)
 
-numero_cedula_entry = ttk.Entry(main_frame)
-numero_cedula_entry.grid(row=3, column=1, pady=2, sticky=(tk.W, tk.E))
-ttk.Label(main_frame, text="Número Cédula:").grid(row=3, column=0, pady=2, sticky=tk.W)
+# Nombre del Juez
+judge_label = ttk.Label(widgets_frame, text="Nombre del Juez:")
+judge_label.grid(row=0, column=0, padx=5, pady=(5, 0), sticky="w")
+judge_entry = ttk.Entry(widgets_frame)
+judge_entry.insert(0, "Nombre Juez")
+judge_entry.bind("<FocusIn>", lambda e: judge_entry.delete('0', 'end'))
+judge_entry.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
-nombre_abogado_entry = ttk.Entry(main_frame)
-nombre_abogado_entry.grid(row=4, column=1, pady=2, sticky=(tk.W, tk.E))
-ttk.Label(main_frame, text="Nombre del Abogado:").grid(row=4, column=0, pady=2, sticky=tk.W)
+# Razón Social
+name_label = ttk.Label(widgets_frame, text="Razón Social:")
+name_label.grid(row=2, column=0, padx=5, pady=(5, 0), sticky="w")
+name_entry = ttk.Entry(widgets_frame)
+name_entry.insert(0, "Razon Social")
+name_entry.bind("<FocusIn>", lambda e: name_entry.delete('0', 'end'))
+name_entry.grid(row=3, column=0, padx=5, pady=5, sticky="ew")
 
-# Botones
-insert_button = ttk.Button(main_frame, text="Insertar Datos", command=insert_row)
-insert_button.grid(row=5, column=0, columnspan=2, pady=5)
+# Número RUC
+ruc_label = ttk.Label(widgets_frame, text="Número RUC:")
+ruc_label.grid(row=4, column=0, padx=5, pady=(5, 0), sticky="w")
+ruc_entry = ttk.Entry(widgets_frame)
+ruc_entry.insert(0, "Numero RUC")
+ruc_entry.bind("<FocusIn>", lambda e: ruc_entry.delete('0', 'end'))
+ruc_entry.grid(row=5, column=0, padx=5, pady=5, sticky="ew")
 
-generate_button = ttk.Button(main_frame, text="Generar Documentos", command=generate_documents)
-generate_button.grid(row=6, column=0, columnspan=2, pady=5)
+# Número de Cédula
+id_label = ttk.Label(widgets_frame, text="Número de Cédula:")
+id_label.grid(row=6, column=0, padx=5, pady=(5, 0), sticky="w")
+id_entry = ttk.Entry(widgets_frame)
+id_entry.insert(0, "Numero Cedula")
+id_entry.bind("<FocusIn>", lambda e: id_entry.delete('0', 'end'))
+id_entry.grid(row=7, column=0, padx=5, pady=5, sticky="ew")
+
+# Selección de Abogado
+lawyer_label = ttk.Label(widgets_frame, text="Abogado:")
+lawyer_label.grid(row=8, column=0, padx=5, pady=(5, 0), sticky="w")
+lawyer_combobox = ttk.Combobox(widgets_frame, values=lawyer_list)
+lawyer_combobox.current(0)
+lawyer_combobox.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
+
+# Botón para insertar
+insert_button = ttk.Button(widgets_frame, text="Insertar", command=insert_row)
+insert_button.grid(row=10, column=0, padx=5, pady=(5, 10), sticky="ew")
+
+separator = ttk.Separator(widgets_frame)
+separator.grid(row=11, column=0, padx=(20, 10), pady=10, sticky="ew")
+
+treeFrame = ttk.Frame(frame)
+treeFrame.grid(row=0, column=1, pady=10)
+treeScroll = ttk.Scrollbar(treeFrame)
+treeScroll.pack(side="right", fill="y")
+
+cols = ("Judge", "Name", "RUC", "ID Number", "Lawyer")
+col_widths = [250, 210, 100, 80, 250]
+treeview = ttk.Treeview(treeFrame, show="headings", yscrollcommand=treeScroll.set, columns=cols, height=13)
+
+for col, width in zip(cols, col_widths):
+    treeview.column(col, width=width)
+    treeview.heading(col, text=col)
+treeview.pack()
+treeScroll.config(command=treeview.yview)
+
+load_data()
 
 root.mainloop()
