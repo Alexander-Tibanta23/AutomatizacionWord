@@ -2,9 +2,11 @@ import tkinter as tk
 from tkinter import ttk
 import openpyxl
 from openpyxl.utils import get_column_letter
+from openpyxl import load_workbook
 
 # Inicializa el almacenamiento de detalles aquí
 details_storage = {}
+selected_item_for_editing = None  # Al inicio del script
 
 def load_data():
     path = "C:/Users/USUARIO/Documents/GitHub/AutomatizacionWord/basedatosPrueba.xlsx"
@@ -55,6 +57,83 @@ def insert_row():
     id_entry.delete(0, "end")
     lawyer_combobox.set(lawyer_list[0])
 
+def delete_row(treeview):
+    selected_item = treeview.selection()[0]  # Obtener el ítem seleccionado
+    if selected_item:
+        # Eliminar de Excel
+        path = "C:/Users/USUARIO/Documents/GitHub/AutomatizacionWord/basedatosPrueba.xlsx"
+        workbook = openpyxl.load_workbook(path)
+        sheet = workbook.active
+        row_to_delete = treeview.index(selected_item) + 2  # +2 porque Excel inicia en 1 y hay encabezado
+        sheet.delete_rows(row_to_delete)
+        workbook.save(path)
+            
+        # Eliminar del Treeview
+        treeview.delete(selected_item)
+    
+def edit_row(treeview):
+    global selected_item_for_editing
+    selected_item_for_editing = treeview.selection()[0]  # Obtener el ítem seleccionado
+    if selected_item_for_editing:
+        selected_values = treeview.item(selected_item_for_editing, 'values')
+        judge_entry.delete(0, tk.END)
+        judge_entry.insert(0, selected_values[0])
+        name_entry.delete(0, tk.END)
+        name_entry.insert(0, selected_values[1])
+        ruc_entry.delete(0, tk.END)
+        ruc_entry.insert(0, selected_values[2])
+        id_entry.delete(0, tk.END)
+        id_entry.insert(0, selected_values[3])
+        lawyer_combobox.set(selected_values[4])
+
+def update_excel_with_details(id_number, new_values):
+    # La ruta al archivo Excel que queremos actualizar
+    filepath = 'detallesBasedatosPrueba.xlsx'
+    # Cargar el workbook
+    wb = load_workbook(filename=filepath)
+    # Cargar la hoja activa o una hoja específica por nombre
+    sheet = wb.active
+    
+    # Asumiendo que el ID es la primera columna (columna A), ajusta según sea necesario
+    id_column = 1
+    # Recorrer las filas en busca del ID correcto
+    for row in range(2, sheet.max_row + 1):  # Comenzar en 2 supone que la primera fila tiene encabezados
+        cell_value = sheet.cell(row=row, column=id_column).value
+        if str(cell_value) == str(id_number):
+            # Hemos encontrado la fila correcta para actualizar
+            for col, value in enumerate(new_values, start=1):  # Ajustar el 'start' según la primera columna de datos
+                sheet.cell(row=row, column=col).value = value
+            break  # Salir del bucle una vez que hemos hecho la actualización
+    
+    # Guardar los cambios en el archivo
+    wb.save(filename=filepath)
+
+def save_changes(treeview):
+    global selected_item_for_editing
+    if selected_item_for_editing:
+        # Obtener los valores editados de los campos de entrada
+        judge = judge_entry.get()
+        name = name_entry.get()
+        ruc = ruc_entry.get()
+        id_number = id_entry.get()
+        lawyer = lawyer_combobox.get()
+        edited_values = [judge, name, ruc, id_number, lawyer]
+
+        # Actualizar en Treeview
+        treeview.item(selected_item_for_editing, values=edited_values)
+        
+        # Actualizar en Excel
+        path = "C:/Users/USUARIO/Documents/GitHub/AutomatizacionWord/basedatosPrueba.xlsx"
+        workbook = openpyxl.load_workbook(path)
+        sheet = workbook.active
+        row_to_update = treeview.index(selected_item_for_editing) + 2
+        for col, value in enumerate(edited_values, start=1):
+            sheet.cell(row=row_to_update, column=col).value = value
+        workbook.save(path)
+
+        # Reset seleccionado para editar
+        selected_item_for_editing = None
+
 def on_double_click(event):
     # Suponiendo que el ID de la selección está correctamente configurado
     selected_item = treeview.selection()[0]
@@ -69,7 +148,7 @@ def on_double_click(event):
 def open_details_window(name, ruc, id_number, lawyer):
 
     load_detail_data(id_number)
-    
+
     # Crear nueva ventana
     details_window = tk.Toplevel(root)
     details_window.title("Detalles")
@@ -119,13 +198,19 @@ def open_details_window(name, ruc, id_number, lawyer):
             entry = ttk.Entry(inputs_frame)
         entry.grid(row=i, column=1, padx=10, pady=5, sticky="ew")
         entries.append(entry)
-
+    
     # Botón para guardar
     ttk.Button(inputs_frame, text="Guardar", command=lambda: save_details(name, ruc, id_number, lawyer, entries[0].get(), entries[1].get(), entries[2].get(), entries[3].get(), detail_treeview)).grid(row=len(labels), column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
+    # Añadir botones de Eliminar y Editar en la ventana de detalles
+    #ttk.Button(inputs_frame, text="Eliminar", command=lambda: delete_detail(detail_treeview, id_number)).grid(row=5, column=0, padx=10, pady=5, sticky="ew")
+    #ttk.Button(inputs_frame, text="Editar", command=lambda: edit_detail(detail_treeview, entries)).grid(row=5, column=1, padx=10, pady=5, sticky="ew")
+
 
     # Ajuste para que los campos de entrada se expandan con la ventana
     details_window.columnconfigure(0, weight=1)
     inputs_frame.columnconfigure(1, weight=1)
+
+
 
 # Función modificada save_details para manejar los datos correctamente.
 def save_details(name, ruc, id_number, lawyer, titulo_credito, concepto, valor_capital, valor_30, detail_treeview):
@@ -221,6 +306,21 @@ lawyer_combobox.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
 # Botón para insertar
 insert_button = ttk.Button(widgets_frame, text="Insertar", command=insert_row)
 insert_button.grid(row=10, column=0, padx=5, pady=(5, 10), sticky="ew")
+
+# Botón para eliminar
+delete_button = ttk.Button(widgets_frame, text="Eliminar", command=lambda: delete_row(treeview))
+delete_button.grid(row=12, column=0, padx=5, pady=(5, 10), sticky="ew")
+
+# Botón para editar
+edit_button = ttk.Button(widgets_frame, text="Editar", command=lambda: edit_row(treeview))
+edit_button.grid(row=13, column=0, padx=5, pady=(5, 10), sticky="ew")
+
+# Boton Guardar Cambios
+
+save_button = ttk.Button(widgets_frame, text="Guardar Cambios", command=lambda: save_changes(treeview))
+save_button.grid(row=14, column=0, padx=10, pady=(5, 10), sticky="ew")
+
+
 
 separator = ttk.Separator(widgets_frame)
 separator.grid(row=11, column=0, padx=(20, 10), pady=10, sticky="ew")
