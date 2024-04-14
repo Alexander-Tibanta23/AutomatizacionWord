@@ -1,9 +1,11 @@
 import tkinter as tk
 from tkinter import ttk
 import openpyxl
+from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl import load_workbook
 from docxtpl import DocxTemplate
+from num2words import num2words
 import datetime
 from datetime import datetime
 import locale
@@ -147,9 +149,9 @@ def on_double_click(event):
     judge, name, ruc, id_number, lawyer = selected_values
 
     # Nuevo código para cargar los detalles guardados
-    open_details_window(name, ruc, id_number, lawyer)
+    open_details_window(judge, name, ruc, id_number, lawyer)
 
-def open_details_window(name, ruc, id_number, lawyer):
+def open_details_window(judge, name, ruc, id_number, lawyer):
 
     load_detail_data(id_number)
 
@@ -166,13 +168,13 @@ def open_details_window(name, ruc, id_number, lawyer):
     detail_tree_scroll.pack(side="right", fill="y")
 
     # Creación del Treeview para los detalles aquí
-    detail_cols = ("Titulo de Credito", "Name", "RUC", "ID Number", "Concepto", "Valor Capital", "Valor Liquidacion", "Valor 30%","Lawyer")
+    detail_cols = ("Titulo de Credito", "Name", "RUC", "ID Number", "Concepto", "Valor Capital", "Valor Liquidacion", "Valor 30%","Lawyer", "Judge")
     detail_treeview = ttk.Treeview(detail_tree_frame, yscrollcommand=detail_tree_scroll.set, columns=detail_cols, show="headings")
     detail_treeview.pack(expand=True, fill="both")
     detail_tree_scroll.config(command=detail_treeview.yview)
 
     # Configuración de las columnas después de la creación del Treeview
-    column_widths = {"Titulo de Credito": 100, "Name": 210, "RUC": 100, "ID Number": 100, "Concepto": 150, "Valor Capital": 70, "Valor Liquidacion": 70,"Valor 30%": 70, "Lawyer": 250}
+    column_widths = {"Titulo de Credito": 100, "Name": 210, "RUC": 100, "ID Number": 100, "Concepto": 150, "Valor Capital": 70, "Valor Liquidacion": 70,"Valor 30%": 70, "Lawyer": 250, "Judge":250}
     for col in detail_cols:
         detail_treeview.heading(col, text=col)
         detail_treeview.column(col, anchor="center", width=column_widths[col])
@@ -272,8 +274,11 @@ def open_details_window(name, ruc, id_number, lawyer):
             # Asumiendo que 'valor_liquidacion' es el índice 7 y que se encuentra en entries[3]
             valor_liquidacion = float(entries[3].get())
             valor_30 = float(valor_liquidacion * 0.3 + valor_liquidacion)
+
+            new_valor_liquidacion = round(valor_liquidacion, 2)
+            new_valor_30 = round(valor_30, 2)
             # Construct new detail list from entry widgets
-            new_values = [entries[0].get(), name, ruc, id_number, entries[1].get(), entries[2].get(), valor_liquidacion, valor_30, lawyer]  # Assuming 'name', 'ruc', 'lawyer' are accessible here
+            new_values = [entries[0].get(), name, ruc, id_number, entries[1].get(), entries[2].get(), new_valor_liquidacion, new_valor_30, lawyer, judge]  # Assuming 'name', 'ruc', 'lawyer' are accessible here
             old_detail = detail_treeview.item(selected_item, 'values')
             
             # Update Excel
@@ -285,46 +290,107 @@ def open_details_window(name, ruc, id_number, lawyer):
             # Update in details_storage
             details_storage[id_number] = [new_values if detail[0] == old_detail[0] else detail for detail in details_storage[id_number]]
 
-    def create_word_document(treeview, another_treeview, judge_name):
-        # Ajustar la configuración regional para fechas en español
-        locale.setlocale(locale.LC_TIME, 'es_ES')
-        selected_item = treeview.get_children()[0]  # Obtenemos la primera fila
+    def create_word_document(treeview):
+        locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
-        # Obtenemos el nombre del abogado de otra tabla
-        lawyer_item = another_treeview.get_children()[0]  # Asume que es el primer item o ajusta según sea necesario
-        lawyer_name = another_treeview.item(lawyer_item, 'values')[0]  # Reemplaza índice_del_nombre_del_abogado por el índice correcto
+        selected_item = treeview.get_children()[0]
+        item_values = treeview.item(selected_item, "values")
+        context_general = {
+            'nombre': item_values[1],
+            'numero_ruc': item_values[2],
+            'numero_cedula': item_values[3],
+            'nombre_abogado': item_values[8],
+            'nombre_juez': item_values[9],
+            'dia_actual': datetime.now().strftime("%d"),
+            'mes_actual': datetime.now().strftime("%B"),
+            'año_actual': datetime.now().strftime("%Y"),
+            'hora_actual': datetime.now().strftime("%H"),
+            'minuto_actual': datetime.now().strftime("%M")
+        }
+
+        data_for_table_capital = []
+        data_for_table_30 = []
+        total_valor_capital = 0.0
+        ord_count = 1
+
+        for item in treeview.get_children():
+            item_values = treeview.item(item, "values")
+            data_for_table_capital.append({
+                'ord': ord_count,
+                'titulo_credito': item_values[0],
+                'concepto': item_values[4],
+                'valor_capital': item_values[5]
+            })
+            data_for_table_30.append({
+                'ord': ord_count,
+                'titulo_credito': item_values[0],
+                'valor_30': item_values[7]
+            })
+            total_valor_capital += float(item_values[5])
+            ord_count += 1
+            parte_entera = int(total_valor_capital)
+            parte_decimal = int((total_valor_capital - parte_entera) * 100)
+            total_en_letras = (num2words(parte_entera, lang='es')).upper()
+
+        context = {
+            **context_general,
+            'tabla_datos_capital': data_for_table_capital,
+            'tabla_datos_30': data_for_table_30,
+            'total_valor_capital': total_valor_capital,
+            'total_en_letras': total_en_letras,
+            'parte_decimal': parte_decimal
+        }
+
+        doc = DocxTemplate("at-plantilla-Documento1.docx")
+        doc.render(context)
+        file_name = f"Documento_{context['nombre'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        doc.save(file_name)
+        print(f"Documento generado con éxito: {file_name}")
+
+    def export_to_excel(treeview, filename="exported_data.xlsx"):
+        # Creamos un libro y seleccionamos la hoja activa
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
         
-        if selected_item:
-            item_values = treeview.item(selected_item, "values")
-            # Crear diccionario con los datos
-            context = {
-                'nombre': item_values[1],
-                'numero_ruc': item_values[2],
-                'numero_cedula': item_values[3],
-                'nombre_abogado': lawyer_name,
-                'nombre_juez': judge_name,  # Usamos el nombre del juez obtenido de la entrada
-                'dia_actual': datetime.now().strftime("%d"),
-                'mes_actual': datetime.now().strftime("%B"),
-                'año_actual': datetime.now().strftime("%Y"),
-                'hora_actual': datetime.now().strftime("%H"),
-                'minuto_actual': datetime.now().strftime("%M")
-            }
+        # Añadimos los títulos de las columnas en la primera fila
+        for i, col in enumerate(treeview["columns"], start=1):
+            cell = sheet.cell(row=1, column=i)
+            cell.value = treeview.heading(col)['text']
+            cell.font = Font(bold=True)
+        
+        # Recorremos los datos del Treeview y los escribimos en el Excel
+        for row_index, item in enumerate(treeview.get_children(), start=2):
+            row_values = treeview.item(item, "values")
+            for col_index, value in enumerate(row_values, start=1):
+                sheet.cell(row=row_index, column=col_index, value=value)
+        
+        # Ajustamos el ancho de las columnas
+        for col in sheet.columns:
+            max_length = 0
+            column = col[0].column_letter  # Get the column name
+            for cell in col:
+                try:  # Necessary to avoid error on empty cells
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            sheet.column_dimensions[column].width = adjusted_width
 
-            # Cargamos la plantilla
-            doc = DocxTemplate("at-plantilla-Documento1.docx")
-            # Aplicamos el contexto a la plantilla
-            doc.render(context)
-            
-            # Construimos el nombre del archivo con el nombre del cliente
-            file_name = f"Documento_{context['nombre']}.docx"
-            file_name = file_name.replace(" ", "_")  # Reemplazamos espacios por guiones bajos para evitar errores en nombres de archivos
+        selected_item = treeview.get_children()[0]
+        item_values = treeview.item(selected_item, "values")
+        context_general = {
+            'nombre': item_values[1],
+            'numero_cedula': item_values[3],
+        }
+        # Guardamos el libro de Excel
+        filename = f"Data_{context_general['nombre'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        workbook.save(filename)
+        print("Datos exportados exitosamente a:", filename)
 
-            # Guardamos el documento
-            doc.save(file_name)
-            print(f"Documento generado con éxito: {file_name}")
 
     # Botón para guardar
-    ttk.Button(inputs_frame, text="Guardar", command=lambda: save_details(name, ruc, id_number, lawyer, entries[0].get(), entries[1].get(), entries[2].get(), entries[3].get(), detail_treeview)).grid(row=len(labels), column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
+    ttk.Button(inputs_frame, text="Insertar", command=lambda: save_details(name, ruc, id_number, lawyer, judge, entries[0].get(), entries[1].get(), entries[2].get(), entries[3].get(), detail_treeview)).grid(row=len(labels), column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
     # Añadir botones de Eliminar y Editar en la ventana de detalles
     ttk.Button(inputs_frame, text="Eliminar", command=lambda: delete_detail(detail_treeview, id_number)).grid(row=5, column=0, padx=10, pady=5, sticky="ew")
     
@@ -334,16 +400,19 @@ def open_details_window(name, ruc, id_number, lawyer):
     ttk.Button(inputs_frame, text="Actualizar", command=lambda: update_detail(detail_treeview, id_number, entries)).grid(row=6, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
 
     # Añadir botón para generar documento en Word
-    generate_doc_button = ttk.Button(inputs_frame, text="Generar Documento", command=lambda: create_word_document(treeview, judge_entry.get()))
+    generate_doc_button = ttk.Button(inputs_frame, text="Generar Documento", command=lambda: create_word_document(detail_treeview))
     generate_doc_button.grid(row=15, column=0, padx=5, pady=(5, 10), sticky="ew")
 
+    # Aquí es donde se debe añadir el botón en la ventana de detalles. Asumiendo que 'inputs_frame' es donde quieres el botón.
+    export_button = ttk.Button(inputs_frame, text="Exportar a Excel", command=lambda: export_to_excel(detail_treeview))
+    export_button.grid(row=7, column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
 
     # Ajuste para que los campos de entrada se expandan con la ventana
     details_window.columnconfigure(0, weight=1)
     inputs_frame.columnconfigure(1, weight=1)
 
 # Función modificada save_details para manejar los datos correctamente.
-def save_details(name, ruc, id_number, lawyer, titulo_credito, concepto, valor_capital, valor_liquidacion, detail_treeview):
+def save_details(name, ruc, id_number, lawyer, judge, titulo_credito, concepto, valor_capital, valor_liquidacion, detail_treeview):
     # Convertimos los valores numéricos correctamente
     try:
         valor_capital = float(valor_capital)  # Convertir a float para manejar decimales
@@ -355,7 +424,7 @@ def save_details(name, ruc, id_number, lawyer, titulo_credito, concepto, valor_c
     # Ruta al nuevo archivo Excel
 
     # Insertamos los valores convertidos y formateados en el Treeview
-    detail_treeview.insert('', 'end', values=(titulo_credito, name, ruc, id_number, concepto, f"{valor_capital:.2f}", f"{valor_liquidacion:.2f}", f"{valor_30:.2f}",lawyer))
+    detail_treeview.insert('', 'end', values=(titulo_credito, name, ruc, id_number, concepto, f"{valor_capital:.2f}", f"{valor_liquidacion:.2f}", f"{valor_30:.2f}", lawyer, judge))
 
     new_excel_path = "C:/Users/USUARIO/Documents/GitHub/AutomatizacionWord/detallesBasedatosPrueba.xlsx"
     
@@ -366,18 +435,18 @@ def save_details(name, ruc, id_number, lawyer, titulo_credito, concepto, valor_c
     except FileNotFoundError:
         workbook = openpyxl.Workbook()
         sheet = workbook.active
-        headers = ["Título de Crédito", "Name", "RUC", "ID Number", "Concepto", "Valor Capital", "Valor Liquidacion", "Valor 30%", "Abogado"]
+        headers = ["Título de Crédito", "Name", "RUC", "ID Number", "Concepto", "Valor Capital", "Valor Liquidacion", "Valor 30%", "Abogado", "Judge"]
         for col, header in enumerate(headers, start=1):
             sheet[get_column_letter(col) + '1'] = header
 
     # Añadir los nuevos datos al final del archivo
-    new_row = [titulo_credito, name, ruc, id_number, concepto, valor_capital, valor_liquidacion, valor_30, lawyer]
+    new_row = [titulo_credito, name, ruc, id_number, concepto, valor_capital, valor_liquidacion, valor_30, lawyer, judge]
     sheet.append(new_row)
 
     # Nuevo código para actualizar details_storage
     if id_number not in details_storage:
         details_storage[id_number] = []
-    details_storage[id_number].append((titulo_credito, concepto, valor_capital, valor_liquidacion,valor_30, lawyer))
+    details_storage[id_number].append((titulo_credito, concepto, valor_capital, valor_liquidacion,valor_30, lawyer, judge))
 
     workbook.save(new_excel_path)
 
