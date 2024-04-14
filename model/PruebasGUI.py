@@ -3,6 +3,11 @@ from tkinter import ttk
 import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl import load_workbook
+from docxtpl import DocxTemplate
+import datetime
+from datetime import datetime
+import locale
+import pandas as pd
 
 # Inicializa el almacenamiento de detalles aquí
 details_storage = {}
@@ -144,7 +149,6 @@ def on_double_click(event):
     # Nuevo código para cargar los detalles guardados
     open_details_window(name, ruc, id_number, lawyer)
 
-
 def open_details_window(name, ruc, id_number, lawyer):
 
     load_detail_data(id_number)
@@ -162,13 +166,13 @@ def open_details_window(name, ruc, id_number, lawyer):
     detail_tree_scroll.pack(side="right", fill="y")
 
     # Creación del Treeview para los detalles aquí
-    detail_cols = ("Titulo de Credito", "Name", "RUC", "ID Number", "Concepto", "Valor Capital", "Valor 30%", "Lawyer")
+    detail_cols = ("Titulo de Credito", "Name", "RUC", "ID Number", "Concepto", "Valor Capital", "Valor Liquidacion", "Valor 30%","Lawyer")
     detail_treeview = ttk.Treeview(detail_tree_frame, yscrollcommand=detail_tree_scroll.set, columns=detail_cols, show="headings")
     detail_treeview.pack(expand=True, fill="both")
     detail_tree_scroll.config(command=detail_treeview.yview)
 
     # Configuración de las columnas después de la creación del Treeview
-    column_widths = {"Titulo de Credito": 100, "Name": 210, "RUC": 100, "ID Number": 100, "Concepto": 150, "Valor Capital": 70, "Valor 30%": 70, "Lawyer": 250}
+    column_widths = {"Titulo de Credito": 100, "Name": 210, "RUC": 100, "ID Number": 100, "Concepto": 150, "Valor Capital": 70, "Valor Liquidacion": 70,"Valor 30%": 70, "Lawyer": 250}
     for col in detail_cols:
         detail_treeview.heading(col, text=col)
         detail_treeview.column(col, anchor="center", width=column_widths[col])
@@ -187,7 +191,7 @@ def open_details_window(name, ruc, id_number, lawyer):
     inputs_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
 
     # Organizar los widgets de entrada y el botón en `inputs_frame` usando `grid`
-    labels = ["Título De Crédito:", "Concepto:", "Valor Capital:", "Valor 30%:"]
+    labels = ["Título De Crédito:", "Concepto:", "Valor Capital:", "Valor Liquidacion:"]
     entries = []
     for i, label in enumerate(labels):
         ttk.Label(inputs_frame, text=label).grid(row=i, column=0, padx=10, pady=5, sticky="w")
@@ -260,13 +264,16 @@ def open_details_window(name, ruc, id_number, lawyer):
             entries[0].insert(0, selected_values[0])  # Título de Crédito
             entries[1].set(selected_values[4])  # Concepto; es un Combobox
             entries[2].insert(0, selected_values[5])  # Valor Capital
-            entries[3].insert(0, selected_values[6])  # Valor 30%
+            entries[3].insert(0, selected_values[6])  # Valor Liquidacion
             
     def update_detail(detail_treeview, id_number, entries):
         selected_item = detail_treeview.selection()[0]
         if selected_item:
+            # Asumiendo que 'valor_liquidacion' es el índice 7 y que se encuentra en entries[3]
+            valor_liquidacion = float(entries[3].get())
+            valor_30 = float(valor_liquidacion * 0.3 + valor_liquidacion)
             # Construct new detail list from entry widgets
-            new_values = [entries[0].get(), name, ruc, id_number, entries[1].get(), entries[2].get(), entries[3].get(), lawyer]  # Assuming 'name', 'ruc', 'lawyer' are accessible here
+            new_values = [entries[0].get(), name, ruc, id_number, entries[1].get(), entries[2].get(), valor_liquidacion, valor_30, lawyer]  # Assuming 'name', 'ruc', 'lawyer' are accessible here
             old_detail = detail_treeview.item(selected_item, 'values')
             
             # Update Excel
@@ -278,6 +285,44 @@ def open_details_window(name, ruc, id_number, lawyer):
             # Update in details_storage
             details_storage[id_number] = [new_values if detail[0] == old_detail[0] else detail for detail in details_storage[id_number]]
 
+    def create_word_document(treeview, another_treeview, judge_name):
+        # Ajustar la configuración regional para fechas en español
+        locale.setlocale(locale.LC_TIME, 'es_ES')
+        selected_item = treeview.get_children()[0]  # Obtenemos la primera fila
+
+        # Obtenemos el nombre del abogado de otra tabla
+        lawyer_item = another_treeview.get_children()[0]  # Asume que es el primer item o ajusta según sea necesario
+        lawyer_name = another_treeview.item(lawyer_item, 'values')[0]  # Reemplaza índice_del_nombre_del_abogado por el índice correcto
+        
+        if selected_item:
+            item_values = treeview.item(selected_item, "values")
+            # Crear diccionario con los datos
+            context = {
+                'nombre': item_values[1],
+                'numero_ruc': item_values[2],
+                'numero_cedula': item_values[3],
+                'nombre_abogado': lawyer_name,
+                'nombre_juez': judge_name,  # Usamos el nombre del juez obtenido de la entrada
+                'dia_actual': datetime.now().strftime("%d"),
+                'mes_actual': datetime.now().strftime("%B"),
+                'año_actual': datetime.now().strftime("%Y"),
+                'hora_actual': datetime.now().strftime("%H"),
+                'minuto_actual': datetime.now().strftime("%M")
+            }
+
+            # Cargamos la plantilla
+            doc = DocxTemplate("at-plantilla-Documento1.docx")
+            # Aplicamos el contexto a la plantilla
+            doc.render(context)
+            
+            # Construimos el nombre del archivo con el nombre del cliente
+            file_name = f"Documento_{context['nombre']}.docx"
+            file_name = file_name.replace(" ", "_")  # Reemplazamos espacios por guiones bajos para evitar errores en nombres de archivos
+
+            # Guardamos el documento
+            doc.save(file_name)
+            print(f"Documento generado con éxito: {file_name}")
+
     # Botón para guardar
     ttk.Button(inputs_frame, text="Guardar", command=lambda: save_details(name, ruc, id_number, lawyer, entries[0].get(), entries[1].get(), entries[2].get(), entries[3].get(), detail_treeview)).grid(row=len(labels), column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
     # Añadir botones de Eliminar y Editar en la ventana de detalles
@@ -288,24 +333,29 @@ def open_details_window(name, ruc, id_number, lawyer):
     # Botón para actualizar
     ttk.Button(inputs_frame, text="Actualizar", command=lambda: update_detail(detail_treeview, id_number, entries)).grid(row=6, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
 
+    # Añadir botón para generar documento en Word
+    generate_doc_button = ttk.Button(inputs_frame, text="Generar Documento", command=lambda: create_word_document(treeview, judge_entry.get()))
+    generate_doc_button.grid(row=15, column=0, padx=5, pady=(5, 10), sticky="ew")
+
 
     # Ajuste para que los campos de entrada se expandan con la ventana
     details_window.columnconfigure(0, weight=1)
     inputs_frame.columnconfigure(1, weight=1)
 
 # Función modificada save_details para manejar los datos correctamente.
-def save_details(name, ruc, id_number, lawyer, titulo_credito, concepto, valor_capital, valor_30, detail_treeview):
+def save_details(name, ruc, id_number, lawyer, titulo_credito, concepto, valor_capital, valor_liquidacion, detail_treeview):
     # Convertimos los valores numéricos correctamente
     try:
         valor_capital = float(valor_capital)  # Convertir a float para manejar decimales
-        valor_30 = float(valor_30)  # Convertir a float para manejar decimales
+        valor_liquidacion = float(valor_liquidacion)
+        valor_30 = float(valor_liquidacion * 0.3 + valor_liquidacion)  # Convertir a float para manejar decimales
     except ValueError:
-        print("Error: Valor Capital y Valor 30% deben ser números decimales.")
+        print("Error: Valor Capital y Valor Liquidacion deben ser números decimales.")
         return  # Salir de la función si hay
     # Ruta al nuevo archivo Excel
 
     # Insertamos los valores convertidos y formateados en el Treeview
-    detail_treeview.insert('', 'end', values=(titulo_credito, name, ruc, id_number, concepto, f"{valor_capital:.2f}", f"{valor_30:.2f}", lawyer))
+    detail_treeview.insert('', 'end', values=(titulo_credito, name, ruc, id_number, concepto, f"{valor_capital:.2f}", f"{valor_liquidacion:.2f}", f"{valor_30:.2f}",lawyer))
 
     new_excel_path = "C:/Users/USUARIO/Documents/GitHub/AutomatizacionWord/detallesBasedatosPrueba.xlsx"
     
@@ -316,18 +366,18 @@ def save_details(name, ruc, id_number, lawyer, titulo_credito, concepto, valor_c
     except FileNotFoundError:
         workbook = openpyxl.Workbook()
         sheet = workbook.active
-        headers = ["Título de Crédito", "Name", "RUC", "ID Number", "Concepto", "Valor Capital", "Valor 30%", "Abogado"]
+        headers = ["Título de Crédito", "Name", "RUC", "ID Number", "Concepto", "Valor Capital", "Valor Liquidacion", "Valor 30%", "Abogado"]
         for col, header in enumerate(headers, start=1):
             sheet[get_column_letter(col) + '1'] = header
 
     # Añadir los nuevos datos al final del archivo
-    new_row = [titulo_credito, name, ruc, id_number, concepto, valor_capital, valor_30, lawyer]
+    new_row = [titulo_credito, name, ruc, id_number, concepto, valor_capital, valor_liquidacion, valor_30, lawyer]
     sheet.append(new_row)
 
     # Nuevo código para actualizar details_storage
     if id_number not in details_storage:
         details_storage[id_number] = []
-    details_storage[id_number].append((titulo_credito, concepto, valor_capital, valor_30, lawyer))
+    details_storage[id_number].append((titulo_credito, concepto, valor_capital, valor_liquidacion,valor_30, lawyer))
 
     workbook.save(new_excel_path)
 
@@ -337,13 +387,14 @@ style = ttk.Style(root)
 root.tk.call("source", "forest-dark.tcl")
 style.theme_use("forest-dark")
 
-lawyer_list = ["Dr. Christian Santiago Izurieta Cruz", "Dr. Atiencia Atiencia Atiencia Atiencia"]
+lawyer_list = ["Dr. Christian Santiago Izurieta Cruz", "Dr. Jorge G Atiencia Gálvez"]
 
 frame = ttk.Frame(root)
 frame.pack()
 
 widgets_frame = ttk.LabelFrame(frame, text="Insertar Datos")
 widgets_frame.grid(row=0, column=0, padx=20, pady=10)
+
 
 # Nombre del Juez
 judge_label = ttk.Label(widgets_frame, text="Nombre del Juez:")
@@ -400,8 +451,6 @@ edit_button.grid(row=13, column=0, padx=5, pady=(5, 10), sticky="ew")
 
 save_button = ttk.Button(widgets_frame, text="Guardar Cambios", command=lambda: save_changes(treeview))
 save_button.grid(row=14, column=0, padx=10, pady=(5, 10), sticky="ew")
-
-
 
 separator = ttk.Separator(widgets_frame)
 separator.grid(row=11, column=0, padx=(20, 10), pady=10, sticky="ew")
