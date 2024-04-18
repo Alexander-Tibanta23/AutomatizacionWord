@@ -9,7 +9,6 @@ from num2words import num2words
 import datetime
 from datetime import datetime
 import locale
-import pandas as pd
 
 # Inicializa el almacenamiento de detalles aquí
 details_storage = {}
@@ -159,6 +158,8 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
     details_window = tk.Toplevel(root)
     details_window.title("Detalles")
 
+    details_window.state('zoomed')
+
     # Frame para el Treeview
     detail_tree_frame = ttk.Frame(details_window)
     detail_tree_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
@@ -292,11 +293,12 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
             # Update in details_storage
             details_storage[id_number] = [new_values if detail[0] == old_detail[0] else detail for detail in details_storage[id_number]]
 
-    def create_word_document(treeview, combo):
+    def create_word_document(treeview, combo, gender_combo):
         locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
         selected_item = treeview.get_children()[0]
         item_values = treeview.item(selected_item, "values")
         selected_concept = combo.get()
+        gender = gender_combo.get()
         context_general = {
             'nombre': item_values[1],
             'numero_ruc': item_values[2],
@@ -309,6 +311,17 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
             'hora_actual': datetime.now().strftime("%H"),
             'minuto_actual': datetime.now().strftime("%M")
         }
+
+        palabras = {
+        'palabra1': 'coactivado' if gender == 'Masculino' else 'coactivada',
+        'palabra2': 'portador' if gender == 'Masculino' else 'portadora',
+        'palabra3': 'incurso' if gender == 'Masculino' else 'incursa',
+        'palabra4': 'contratado' if gender == 'Masculino' else 'contratada',
+        'palabra5': 'deudor' if gender == 'Masculino' else 'deudora',
+        'palabra6': 'servidor' if gender == 'Masculino' else 'servidora'
+        }
+
+        context_general.update(palabras)
 
         data_for_table_capital = []
         data_for_table_30 = []
@@ -339,6 +352,7 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
 
         context = {
             **context_general,
+            **palabras,
             'tabla_datos_capital': data_for_table_capital,
             'tabla_datos_30': data_for_table_30,
             'total_valor_capital': total_valor_capital,
@@ -431,8 +445,12 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
     ], width=50)
     combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 
+    # Combo para seleccionar género
+    gender_combo = ttk.Combobox(combo_frame, values=["Masculino", "Femenino"], width=15)
+    gender_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+
     generate_button = ttk.Button(combo_frame, text="Generar Documento", command=lambda: create_word_document(
-        detail_treeview, combo
+        detail_treeview, combo, gender_combo
     ))
     generate_button.pack(side=tk.LEFT, padx=(5, 0))
 
@@ -479,6 +497,7 @@ def save_details(name, ruc, id_number, lawyer, judge, titulo_credito, concepto, 
     workbook.save(new_excel_path)
 
 root = tk.Tk()
+root.state('zoomed')
 
 style = ttk.Style(root)
 root.tk.call("source", "forest-dark.tcl")
