@@ -199,7 +199,7 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
     for i, label in enumerate(labels):
         ttk.Label(inputs_frame, text=label).grid(row=i, column=0, padx=10, pady=5, sticky="w")
         if label == "Concepto:":
-            entry = ttk.Combobox(inputs_frame, values=["PLANTILLA DE APORTES", "PRESTAMOS", "RESPONSABILIDAD PATRONAL", "FONDO DE RESERVA"])
+            entry = ttk.Combobox(inputs_frame, values=["PLANILLA DE APORTES", "PLANILLA DE PRESTAMOS", "PLANILLA DE RESPONSABILIDAD PATRONAL", "PLANILLA DE FONDOS DE RESERVA"])
             entry.current(0)
         else:
             entry = ttk.Entry(inputs_frame)
@@ -254,6 +254,25 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
     # Suponiendo que 'inputs_frame' es donde quieres el botón y 'detail_treeview' es tu Treeview
     setup_delete_button(detail_treeview, inputs_frame)
 
+    def auto_insert_dash(event):
+        # Obtiene el contenido actual de la entrada
+        content = date_entry.get()
+        # Elimina todos los guiones para manejar las ediciones de usuario
+        content = content.replace("-", "")
+        # Inserta guiones automáticamente después del año y del mes
+        if len(content) > 6:
+            date_entry.delete(0, tk.END)
+            date_entry.insert(0, content[:4] + "-" + content[4:6] + "-" + content[6:8])
+        elif len(content) > 4:
+            date_entry.delete(0, tk.END)
+            date_entry.insert(0, content[:4] + "-" + content[4:6])
+        elif len(content) > 0:
+            date_entry.delete(0, tk.END)
+            date_entry.insert(0, content[:4])
+
+    def on_focus_in(event):
+        if date_entry.get() == "aaaa-mm-dd":
+            date_entry.delete(0, tk.END)
 
     def edit_detail(detail_treeview, entries):
         selected_item = detail_treeview.selection()[0]
@@ -366,7 +385,7 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
         doc.save(file_name)
         print(f"Documento generado con éxito: {file_name}")
 
-    def export_to_excel(treeview, filename="exported_data.xlsx"):
+    def export_to_excel(treeview, serial_entry, date_entry, filename="exported_data.xlsx"):
         # Creamos un libro y seleccionamos la hoja activa
         workbook = openpyxl.Workbook()
         sheet = workbook.active
@@ -383,18 +402,35 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
             for col_index, value in enumerate(row_values, start=1):
                 sheet.cell(row=row_index, column=col_index, value=value)
         
+        # Añadimos la nueva columna "Documento" al final
+        document_column = len(treeview["columns"]) + 1
+        sheet.cell(row=1, column=document_column, value="Providencia").font = Font(bold=True)
+        for row_index in range(2, len(treeview.get_children()) + 2):
+            sheet.cell(row=row_index, column=document_column, value="Auto de pago inmediato")
+
         # Ajustamos el ancho de las columnas
         for col in sheet.columns:
             max_length = 0
             column = col[0].column_letter  # Get the column name
             for cell in col:
-                try:  # Necessary to avoid error on empty cells
+                try:
                     if len(str(cell.value)) > max_length:
-                        max_length = len(cell.value)
+                        max_length = len(str(cell.value))
                 except:
                     pass
             adjusted_width = (max_length + 2)
             sheet.column_dimensions[column].width = adjusted_width
+
+        # Obtener el número de filas actualmente en uso
+        last_row = sheet.max_row + 2  # dos saltos de línea debajo
+
+        # Agregar "Dato Serial"
+        sheet.cell(row=last_row, column=1, value="Dato Serial")
+        sheet.cell(row=last_row, column=2, value=serial_entry.get())
+
+        # Agregar "Fecha Emisión (Sorteo)"
+        sheet.cell(row=last_row + 1, column=1, value="Fecha Emisión (Sorteo)")
+        sheet.cell(row=last_row + 1, column=2, value=date_entry.get())
 
         selected_item = treeview.get_children()[0]
         item_values = treeview.item(selected_item, "values")
@@ -406,6 +442,9 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
         filename = f"Data_{context_general['nombre'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         workbook.save(filename)
         print("Datos exportados exitosamente a:", filename)
+
+# Ejemplo de uso:
+# export_to_excel(treeview)
 
 
     # Añadir los botones para Insertar, Editar, Actualizar, y Eliminar
@@ -432,8 +471,23 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
         detail_treeview, id_number
     )).grid(row=len(labels) + 2, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
 
-    # Aquí es donde se debe añadir el botón en la ventana de detalles. Asumiendo que 'inputs_frame' es donde quieres el botón.
-    export_button = ttk.Button(inputs_frame, text="Exportar a Excel", command=lambda: export_to_excel(detail_treeview))
+    # Crear label y entrada para "Dato Serial"
+    serial_label = ttk.Label(inputs_frame, text="Dato Serial:")
+    serial_label.grid(row=len(labels) + 3, column=2, padx=(0, 5), pady=10, sticky="ew")
+    serial_entry = ttk.Entry(inputs_frame)
+    serial_entry.grid(row=len(labels) + 3, column=3, padx=(0, 20), pady=10, sticky="ew")
+
+    # Crear label y entrada para "Fecha Emisión (Sorteo)"
+    date_label = ttk.Label(inputs_frame, text="Fecha Emisión (Sorteo):")
+    date_label.grid(row=len(labels) + 3, column=4, padx=(0, 5), pady=10, sticky="ew")
+    date_entry = ttk.Entry(inputs_frame)
+    date_entry.grid(row=len(labels) + 3, column=5, padx=(0, 20), pady=10, sticky="ew")
+    date_entry.insert(0, "aaaa-mm-dd")  # Placeholder text
+    date_entry.bind("<FocusIn>", lambda e: date_entry.delete('0', 'end'))
+    date_entry.bind("<KeyRelease>", auto_insert_dash)
+
+    # Botón de exportación modificada para incluir entradas de serial y fecha
+    export_button = ttk.Button(inputs_frame, text="Exportar a Excel", command=lambda: export_to_excel(detail_treeview, serial_entry, date_entry))
     export_button.grid(row=len(labels) + 3, column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
 
     # ComboBox y botón para generar documento en Word
@@ -441,7 +495,7 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
     combo_frame.grid(row=len(labels) + 4, column=0, columnspan=2, padx=10, pady=(5, 10), sticky="ew")
 
     combo = ttk.Combobox(combo_frame, values=[
-        "PLANTILLA DE APORTES", "PRESTAMOS", "RESPONSABILIDAD PATRONAL", "FONDO DE RESERVA"
+        "PLANILLA DE APORTES", "PLANILLA DE PRESTAMOS", "PLANILLA DE RESPONSABILIDAD PATRONAL", "PLANILLA DE FONDOS DE RESERVA"
     ], width=50)
     combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 
@@ -497,13 +551,14 @@ def save_details(name, ruc, id_number, lawyer, judge, titulo_credito, concepto, 
     workbook.save(new_excel_path)
 
 root = tk.Tk()
+root.title("TABLA PRINCIPAL ATIENCIA & ASOCIADOS")
 root.state('zoomed')
 
 style = ttk.Style(root)
-root.tk.call("source", "forest-dark.tcl")
+root.tk.call("source", "C:/Users/USUARIO/Documents/GitHub/AutomatizacionWord/forest-dark.tcl")
 style.theme_use("forest-dark")
 
-lawyer_list = ["Dr. Christian Santiago Izurieta Cruz", "Dr. Jorge G Atiencia Gálvez"]
+lawyer_list = ["Dr. Christian Santiago Izurieta Cruz", "Dr. Jorge Gonzalo Atiencia Gálvez"]
 
 frame = ttk.Frame(root)
 frame.pack()
