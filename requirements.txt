@@ -1,0 +1,5 @@
+openpyxl
+docxtpl
+docx
+tkinter
+num2words

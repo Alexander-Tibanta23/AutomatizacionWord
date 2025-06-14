@@ -1,0 +1,9 @@
+JURIDICA/
+NATURAL/
+output/
+*.pyc
+__pycache__/
+*.pyo
+*.exe
+*.log
+.env

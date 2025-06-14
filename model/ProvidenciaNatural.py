@@ -451,7 +451,12 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
         'palabra3': 'incurso' if gender == 'Masculino' else 'incursa',
         'palabra4': 'contratado' if gender == 'Masculino' else 'contratada',
         'palabra5': 'deudor' if gender == 'Masculino' else 'deudora',
-        'palabra6': 'servidor' if gender == 'Masculino' else 'servidora'
+        'palabra6': 'servidor' if gender == 'Masculino' else 'servidora',
+        'palabra7': 'socio' if gender == 'Masculino' else 'socia',
+        'palabra8': 'beneficiario' if gender == 'Masculino' else 'beneficiaria',
+        'palabra9': 'el' if gender == 'Masculino' else 'la',
+        'palabra10': 'socio' if gender == 'Masculino' else 'socia',
+        'palabra11': 'beneficiario' if gender == 'Masculino' else 'beneficiaria' 
         }
 
         context_general.update(palabras)
@@ -514,7 +519,16 @@ def open_details_window(judge, name, ruc, id_number, lawyer):
         if not os.path.exists(complete_path):
             os.makedirs(complete_path)
 
-        file_name = f"{complete_path}/Documento_{context['nombre'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        # Verifica si el archivo ya existe y añade un número al final si es necesario
+        file_name_base = f"{context['nombre'].replace(' ', '_')}"
+        file_extension = ".docx"
+        file_name = f"{complete_path}/{file_name_base}{file_extension}"
+        counter = 1
+
+        while os.path.exists(file_name):
+            file_name = f"{complete_path}/{file_name_base}_{counter}{file_extension}"
+            counter += 1
+
         doc.save(file_name)
         print(f"Documento generado con éxito: {file_name}")
 

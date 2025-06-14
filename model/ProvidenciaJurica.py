@@ -17,7 +17,7 @@ import sys
 details_window = None
 detail_treeview = None
 details_storage = {}
-selected_item_for_editing = None  # Al inicio del script
+selected_item_for_editing = None
 
 def load_data():
     path = "data/basedatosPruebaJuridica.xlsx"
@@ -462,7 +462,8 @@ def open_details_window(judge, name, ruc, id_number, lawyer, empresa):
         'palabra5': 'deudor' if gender == 'Masculino' else 'deudora',
         'palabra6': 'servidor' if gender == 'Masculino' else 'servidora', 
         'palabra7': 'señor' if gender == 'Masculino' else 'señora',
-        'palabra8': 'representado' if gender == 'Masculino' else 'representada'
+        'palabra8': 'representado' if gender == 'Masculino' else 'representada',
+        'palabra9': 'el' if gender == 'Masculino' else 'la'
         }
 
         context_general.update(palabras)
@@ -525,8 +526,16 @@ def open_details_window(judge, name, ruc, id_number, lawyer, empresa):
         if not os.path.exists(complete_path):
             os.makedirs(complete_path)
 
-        # Guardar el archivo en la carpeta creada
-        file_name = f"{complete_path}/Documento_{context['nombre_empresa'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        # Verifica si el archivo ya existe y añade un número al final si es necesario
+        file_name_base = f"{context['nombre_empresa'].replace(' ', '_')}"
+        file_extension = ".docx"
+        file_name = f"{complete_path}/{file_name_base}{file_extension}"
+        counter = 1
+
+        while os.path.exists(file_name):
+            file_name = f"{complete_path}/{file_name_base}_{counter}{file_extension}"
+            counter += 1
+
         doc.save(file_name)
         print(f"Documento generado con éxito: {file_name}")
 
